@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import Tree from "rc-tree";
 import "rc-tree/assets/index.css";
 import axios from "axios";
@@ -8,17 +8,63 @@ export default function WordEditor() {
   const [nodes, setNodes] = useState([]);
   const [selectedNode, setSelectedNode] = useState(null);
 
-  const [renameMode, setRenameMode] = useState(false);
   const [renameText, setRenameText] = useState("");
-
   const [cutNode, setCutNode] = useState(null);
   const [copyNode, setCopyNode] = useState(null);
 
-  // Render title simple
-  const renderTitle = (node) => (
-    <span style={{ cursor: "pointer" }}>{node.title}</span>
-  );
+  const [contextMenu, setContextMenu] = useState(null);
+  const [editingNodeId, setEditingNodeId] = useState(null);
 
+  useEffect(() => {
+    const close = () => setContextMenu(null);
+    window.addEventListener("click", close);
+    return () => window.removeEventListener("click", close);
+  }, []);
+
+  // APPLY INLINE RENAME
+  const applyInlineRename = (id) => {
+    const updated = updateNode(nodes, id, (n) => ({
+      ...n,
+      title: renameText,
+    }));
+
+    setNodes(updated);
+
+    if (selectedNode?.id === id) {
+      setSelectedNode({ ...selectedNode, title: renameText });
+    }
+
+    setEditingNodeId(null);
+  };
+
+  // INLINE EDIT TITLE
+  const renderTitle = (node) => {
+    const isEditing = editingNodeId === node.id;
+
+    if (isEditing) {
+      return (
+        <input
+          autoFocus
+          value={renameText}
+          onChange={(e) => setRenameText(e.target.value)}
+          style={{
+            padding: "2px 4px",
+            fontSize: "14px",
+            width: "80%",
+          }}
+          onBlur={() => applyInlineRename(node.id)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") applyInlineRename(node.id);
+            if (e.key === "Escape") setEditingNodeId(null);
+          }}
+        />
+      );
+    }
+
+    return <span style={{ cursor: "pointer" }}>{node.title}</span>;
+  };
+
+  // MAP TREE DATA
   const convert = (n) => ({
     title: renderTitle(n),
     key: n.id,
@@ -28,12 +74,12 @@ export default function WordEditor() {
 
   const treeData = nodes.map((n) => convert(n));
 
-  // Select node
   const onSelect = (keys, info) => {
     setSelectedNode(info.node.raw);
+    setContextMenu(null);
   };
 
-  // Upload .docx
+  // UPLOAD DOCX
   const uploadWord = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -41,7 +87,7 @@ export default function WordEditor() {
     const form = new FormData();
     form.append("file", file);
 
-    const res = await axios.post("http://localhost:4000/api/upload", form, {
+    const res = await axios.post("http://localhost:4000/api/upload-file", form, {
       headers: { "Content-Type": "multipart/form-data" },
     });
 
@@ -49,7 +95,7 @@ export default function WordEditor() {
     setSelectedNode(null);
   };
 
-  // Update content
+  // UPDATE CONTENT
   const updateContent = (html) => {
     const updated = updateNode(nodes, selectedNode.id, (n) => ({
       ...n,
@@ -60,39 +106,26 @@ export default function WordEditor() {
     setSelectedNode({ ...selectedNode, contentHtml: html });
   };
 
-  // Rename
+  // RENAME
   const rename = () => {
     if (!selectedNode) return alert("Select a node");
     setRenameText(selectedNode.title);
-    setRenameMode(true);
+    setEditingNodeId(selectedNode.id);
   };
 
-  const applyRename = () => {
-    const updated = updateNode(nodes, selectedNode.id, (n) => ({
-      ...n,
-      title: renameText,
-    }));
-
-    setNodes(updated);
-    setSelectedNode({ ...selectedNode, title: renameText });
-    setRenameMode(false);
-  };
-
-  // CUT
+  // CUT / COPY / PASTE
   const cut = () => {
     if (!selectedNode) return alert("Select a node");
     setCutNode(selectedNode);
     setCopyNode(null);
   };
 
-  // COPY
   const copy = () => {
     if (!selectedNode) return alert("Select a node");
     setCopyNode(selectedNode);
     setCutNode(null);
   };
 
-  // PASTE (as child)
   const paste = () => {
     if (!selectedNode) return alert("Select a destination");
 
@@ -100,10 +133,7 @@ export default function WordEditor() {
     if (!source) return alert("Nothing to paste");
 
     let updated = [...nodes];
-
-    if (cutNode) {
-      updated = removeNode(updated, source.id);
-    }
+    if (cutNode) updated = removeNode(updated, source.id);
 
     const newNode = {
       ...source,
@@ -121,14 +151,14 @@ export default function WordEditor() {
     setCopyNode(null);
   };
 
-  // Delete
+  // DELETE
   const deleteNode = () => {
     if (!selectedNode) return alert("Select a node");
     setNodes(removeNode(nodes, selectedNode.id));
     setSelectedNode(null);
   };
 
-  // Add Section
+  // ADD SECTION
   const addSection = () => {
     const newNode = {
       id: "n_" + Math.random().toString(36).slice(2),
@@ -140,9 +170,10 @@ export default function WordEditor() {
     setNodes([...nodes, newNode]);
   };
 
-  // Add Sub Section
+  // ADD SUB SECTION
   const addSubSection = () => {
     if (!selectedNode) return alert("Select a parent");
+
     const newNode = {
       id: "n_" + Math.random().toString(36).slice(2),
       title: "New Sub Section",
@@ -159,12 +190,12 @@ export default function WordEditor() {
     );
   };
 
-  // Export
+  // EXPORT WORD
   const exportWord = async () => {
     const res = await axios.post("http://localhost:4000/api/export", nodes, {
       responseType: "blob",
     });
-
+    
     const url = window.URL.createObjectURL(new Blob([res.data]));
     const a = document.createElement("a");
     a.href = url;
@@ -172,7 +203,67 @@ export default function WordEditor() {
     a.click();
   };
 
-  // Helpers
+  // ---------------------------
+  // DRAG & DROP FIXED VERSION
+  // ---------------------------
+  const onDrop = (info) => {
+    const dragKey = info.dragNode.key;
+    const dropKey = info.node.key;
+    const dropPosition = info.dropPosition;
+    const dropToGap = info.dropToGap;
+
+    let newTree = [...nodes];
+    let dragItem = null;
+
+    newTree = removeNode(newTree, dragKey, (removed) => {
+      dragItem = removed;
+    });
+
+    if (!dragItem) return;
+
+    // Dropped INSIDE → CHILD
+    if (!dropToGap) {
+      dragItem.level = info.node.raw.level + 1;
+      newTree = updateNode(newTree, dropKey, (n) => ({
+        ...n,
+        children: [...n.children, dragItem],
+      }));
+      return setNodes(newTree);
+    }
+
+    // Dropped on GAP → sibling
+    const targetLevel = info.node.raw.level;
+    dragItem.level = targetLevel;
+
+    newTree = insertSibling(newTree, dropKey, dragItem, dropPosition);
+    setNodes(newTree);
+  };
+
+  // FIXED VERSION (No ESLint errors)
+  const insertSibling = (list, targetId, item, dropPosition) => {
+    let result = [];
+
+    for (let node of list) {
+      if (node.id === targetId) {
+        if (dropPosition > 0) {
+          result.push(node);
+          result.push(item);
+        } else {
+          result.push(item);
+          result.push(node);
+        }
+      } else {
+        result.push({
+          ...node,
+          children: insertSibling(node.children, targetId, item, dropPosition),
+        });
+      }
+    }
+
+    return result;
+  };
+
+  // HELPERS
   function updateNode(list, id, updater) {
     return list.map((n) => {
       if (n.id === id) return updater(n);
@@ -180,13 +271,21 @@ export default function WordEditor() {
     });
   }
 
-  function removeNode(list, id) {
-    return list
-      .filter((n) => n.id !== id)
-      .map((n) => ({ ...n, children: removeNode(n.children, id) }));
+  function removeNode(list, id, callback = null) {
+    let result = [];
+    for (let n of list) {
+      if (n.id === id) {
+        if (callback) callback(n);
+        continue;
+      }
+      result.push({
+        ...n,
+        children: removeNode(n.children, id, callback),
+      });
+    }
+    return result;
   }
 
-  // Jodit config
   const config = {
     readonly: false,
     height: 600,
@@ -195,11 +294,9 @@ export default function WordEditor() {
 
   return (
     <div style={{ display: "flex", height: "92vh" }}>
-      
       {/* LEFT SIDE */}
       <div style={{ width: "28%", borderRight: "1px solid #ccc", padding: 10 }}>
         
-        {/* Toolbar */}
         <div style={{ marginBottom: 10 }}>
           <input type="file" accept=".docx" onChange={uploadWord} />
 
@@ -212,74 +309,77 @@ export default function WordEditor() {
               ⬇ Export
             </button>
           </div>
-
-          <hr />
-
-          {/* operations */}
-        {/* --- Operations Toolbar (Micro) --- */}
-<div
-  style={{
-    display: "flex",
-    gap: "8px",
-    marginTop: 8,
-    alignItems: "center",
-    padding: "4px 0",
-  }}
->
-  {[
-    { icon: "✂", label: "Cut", func: cut },
-    { icon: "📄", label: "Copy", func: copy },
-    { icon: "📌", label: "Paste", func: paste },
-    { icon: "✏", label: "Rename", func: rename },
-    { icon: "🗑", label: "Delete", func: deleteNode },
-  ].map((btn) => (
-    <button
-      key={btn.label}
-      onClick={btn.func}
-      style={{
-        width: "40px",
-        height: "40px",
-        borderRadius: "6px",
-        border: "1px solid #ccc",
-        background: "#fff",
-        cursor: "pointer",
-        display: "flex",
-        flexDirection: "column",
-        justifyContent: "center",
-        alignItems: "center",
-        fontSize: "11px",
-        color: "#333",
-        transition: "0.2s",
-        padding: 0,
-      }}
-      onMouseEnter={(e) => (e.target.style.background = "#f1f1f1")}
-      onMouseLeave={(e) => (e.target.style.background = "#fff")}
-    >
-      <span style={{ fontSize: "15px", marginBottom: "1px" }}>{btn.icon}</span>
-      <span style={{ fontSize: "9px" }}>{btn.label}</span>
-    </button>
-  ))}
-</div>
-
-
-          {renameMode && (
-            <div style={{ marginTop: 10 }}>
-              <input
-                value={renameText}
-                onChange={(e) => setRenameText(e.target.value)}
-              />
-              <button onClick={applyRename}>Save</button>
-            </div>
-          )}
-
         </div>
+
+        {/* Divider */}
+        <div
+          style={{
+            height: "1px",
+            background: "#d9d9d9",
+            margin: "12px 0",
+          }}
+        ></div>
 
         <Tree
           treeData={treeData}
           defaultExpandAll
-          onSelect={onSelect}
           draggable
+          onSelect={onSelect}
+          onDrop={onDrop}
+          onRightClick={(info) => {
+            setSelectedNode(info.node.raw);
+            setContextMenu({
+              x: info.event.clientX,
+              y: info.event.clientY,
+              node: info.node.raw,
+            });
+          }}
         />
+
+        {/* Context Menu */}
+        {contextMenu && (
+          <div
+            style={{
+              position: "fixed",
+              top: contextMenu.y,
+              left: contextMenu.x,
+              background: "#fff",
+              border: "1px solid #ccc",
+              borderRadius: 4,
+              boxShadow: "0 2px 6px rgba(0,0,0,0.2)",
+              zIndex: 9999,
+              width: 150,
+              padding: "4px 0",
+            }}
+          >
+            {[
+              { label: "✂ Cut", action: cut },
+              { label: "📄 Copy", action: copy },
+              { label: "📌 Paste", action: paste },
+              { label: "✏ Rename", action: rename },
+              { label: "🗑 Delete", action: deleteNode },
+            ].map((item) => (
+              <div
+                key={item.label}
+                onClick={() => {
+                  item.action();
+                  setContextMenu(null);
+                }}
+                style={{
+                  padding: "6px 12px",
+                  cursor: "pointer",
+                  fontSize: 14,
+                }}
+                onMouseEnter={(e) =>
+                  (e.target.style.background = "#f1f1f1")
+                }
+                onMouseLeave={(e) => (e.target.style.background = "#fff")}
+              >
+                {item.label}
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* RIGHT SIDE */}
