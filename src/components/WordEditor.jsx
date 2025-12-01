@@ -14,6 +14,8 @@ export default function WordEditor() {
   const [cutNode, setCutNode] = useState(null);
   const [copyNode, setCopyNode] = useState(null);
 
+  const baseURL = 'EDITOR-BACKEND-SERVICE/';
+
   // Render title simple
   const renderTitle = (node) => (
     <span style={{ cursor: "pointer" }}>{node.title}</span>
@@ -41,7 +43,7 @@ export default function WordEditor() {
     const form = new FormData();
     form.append("file", file);
 
-    const res = await axios.post("http://localhost:4000/api/upload", form, {
+    const res = await axios.post(baseURL + "api/upload", form, {
       headers: { "Content-Type": "multipart/form-data" },
     });
 
@@ -161,7 +163,7 @@ export default function WordEditor() {
 
   // Export
   const exportWord = async () => {
-    const res = await axios.post("http://localhost:4000/api/export", nodes, {
+    const res = await axios.post(baseURL + "api/export", nodes, {
       responseType: "blob",
     });
 
@@ -195,10 +197,10 @@ export default function WordEditor() {
 
   return (
     <div style={{ display: "flex", height: "92vh" }}>
-      
+
       {/* LEFT SIDE */}
       <div style={{ width: "28%", borderRight: "1px solid #ccc", padding: 10 }}>
-        
+
         {/* Toolbar */}
         <div style={{ marginBottom: 10 }}>
           <input type="file" accept=".docx" onChange={uploadWord} />
@@ -216,50 +218,50 @@ export default function WordEditor() {
           <hr />
 
           {/* operations */}
-        {/* --- Operations Toolbar (Micro) --- */}
-<div
-  style={{
-    display: "flex",
-    gap: "8px",
-    marginTop: 8,
-    alignItems: "center",
-    padding: "4px 0",
-  }}
->
-  {[
-    { icon: "✂", label: "Cut", func: cut },
-    { icon: "📄", label: "Copy", func: copy },
-    { icon: "📌", label: "Paste", func: paste },
-    { icon: "✏", label: "Rename", func: rename },
-    { icon: "🗑", label: "Delete", func: deleteNode },
-  ].map((btn) => (
-    <button
-      key={btn.label}
-      onClick={btn.func}
-      style={{
-        width: "40px",
-        height: "40px",
-        borderRadius: "6px",
-        border: "1px solid #ccc",
-        background: "#fff",
-        cursor: "pointer",
-        display: "flex",
-        flexDirection: "column",
-        justifyContent: "center",
-        alignItems: "center",
-        fontSize: "11px",
-        color: "#333",
-        transition: "0.2s",
-        padding: 0,
-      }}
-      onMouseEnter={(e) => (e.target.style.background = "#f1f1f1")}
-      onMouseLeave={(e) => (e.target.style.background = "#fff")}
-    >
-      <span style={{ fontSize: "15px", marginBottom: "1px" }}>{btn.icon}</span>
-      <span style={{ fontSize: "9px" }}>{btn.label}</span>
-    </button>
-  ))}
-</div>
+          {/* --- Operations Toolbar (Micro) --- */}
+          <div
+            style={{
+              display: "flex",
+              gap: "8px",
+              marginTop: 8,
+              alignItems: "center",
+              padding: "4px 0",
+            }}
+          >
+            {[
+              { icon: "✂", label: "Cut", func: cut },
+              { icon: "📄", label: "Copy", func: copy },
+              { icon: "📌", label: "Paste", func: paste },
+              { icon: "✏", label: "Rename", func: rename },
+              { icon: "🗑", label: "Delete", func: deleteNode },
+            ].map((btn) => (
+              <button
+                key={btn.label}
+                onClick={btn.func}
+                style={{
+                  width: "40px",
+                  height: "40px",
+                  borderRadius: "6px",
+                  border: "1px solid #ccc",
+                  background: "#fff",
+                  cursor: "pointer",
+                  display: "flex",
+                  flexDirection: "column",
+                  justifyContent: "center",
+                  alignItems: "center",
+                  fontSize: "11px",
+                  color: "#333",
+                  transition: "0.2s",
+                  padding: 0,
+                }}
+                onMouseEnter={(e) => (e.target.style.background = "#f1f1f1")}
+                onMouseLeave={(e) => (e.target.style.background = "#fff")}
+              >
+                <span style={{ fontSize: "15px", marginBottom: "1px" }}>{btn.icon}</span>
+                <span style={{ fontSize: "9px" }}>{btn.label}</span>
+              </button>
+            ))}
+          </div>
 
 
           {renameMode && (

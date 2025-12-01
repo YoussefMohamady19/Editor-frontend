@@ -4,6 +4,10 @@
 /node_modules
 /.pnp
 .pnp.js
+resources/
+build/
+mta_archives/
+editorapp-content.zip
 
 # testing
 /coverage
