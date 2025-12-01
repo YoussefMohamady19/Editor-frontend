@@ -2,6 +2,7 @@
   "name": "word-editor",
   "version": "0.1.0",
   "private": true,
+  "homepage": ".",
   "dependencies": {
     "@ckeditor/ckeditor5-build-classic": "^41.4.2",
     "@ckeditor/ckeditor5-react": "^11.0.0",
@@ -22,7 +23,7 @@
   },
   "scripts": {
     "start": "react-scripts start",
-    "build": "react-scripts build",
+    "build": "react-scripts build && cd build && npx bestzip ../editorapp-content.zip . ",
     "test": "react-scripts test",
     "eject": "react-scripts eject"
   },
@@ -43,5 +44,13 @@
       "last 1 firefox version",
       "last 1 safari version"
     ]
+  },
+  "devDependencies": {
+    "@sap/approuter": "^20.6.0",
+    "bestzip": "^2.2.1",
+    "gh-pages": "^6.3.0"
+  },
+  "sap.ui": {
+    "technology": "react.js"
   }
 }

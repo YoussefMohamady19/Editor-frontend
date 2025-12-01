@@ -1,0 +1,92 @@
+_schema-version: "3.2"
+ID: editorapp
+version: 0.0.1
+modules:
+- name: editorapp-destination-content
+  type: com.sap.application.content
+  requires:
+    - name: uaa_editorapp
+      parameters:
+        service-key:
+          name: uaa_editorapp-key
+    - name: editorapp_html_repo_host
+      parameters:
+        service-key:
+          name: editorapp_html_repo_host-key
+    - name: editorapp-destination-service
+      parameters:
+        content-target: true
+  parameters:
+    content:
+      instance:
+        destinations:
+          - Name: my_service_hello_world_html_repo_host
+            ServiceInstanceName: editorapp-html5-app-host-service
+            ServiceKeyName: editorapp_html_repo_host-key
+            sap.cloud.service: editorapp
+          - Name: my_service_uaa_hello_world
+            Authentication: OAuth2UserTokenExchange
+            ServiceInstanceName: editorapp-xsuaa-service
+            ServiceKeyName: uaa_editorapp-key
+            sap.cloud.service: editorapp
+        existing_destinations_policy: ignore
+  build-parameters:
+    no-source: true
+- name: editorapp_ui_deployer
+  type: com.sap.application.content
+  path: .
+  requires:
+  - name: editorapp_html_repo_host
+    parameters:
+      content-target: true
+  build-parameters:
+    build-result: resources
+    requires:
+    - artifacts:
+      - editorapp-content.zip
+      name: editorapp
+      target-path: resources/
+
+- name: editorapp
+  type: html5
+  path: .
+  build-parameters:
+    builder: custom
+    commands:
+    - npm install
+    - npm run build
+    supported-platforms: []
+
+resources:
+- name: editorapp-destination-service
+  type: org.cloudfoundry.managed-service
+  parameters:
+    config:
+     HTML5Runtime_enabled: true
+     init_data:
+        instance:
+          destinations:
+          - Authentication: NoAuthentication
+            Name: ui5
+            ProxyType: Internet
+            Type: HTTP
+            URL: https://ui5.sap.com
+          existing_destinations_policy: update
+        version: 1.0.0
+    service: destination
+    service-name: editorapp-destination-service
+    service-plan: lite 
+- name: editorapp_html_repo_host
+  type: org.cloudfoundry.managed-service
+  parameters:
+    service: html5-apps-repo
+    service-name: editorapp-html5-app-host-service
+    service-plan: app-host
+- name: uaa_editorapp
+  type: org.cloudfoundry.managed-service
+  parameters:
+    path: ./xs-security.json
+    service: xsuaa
+    service-name: editorapp-xsuaa-service
+    service-plan: application
+

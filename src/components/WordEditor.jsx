@@ -12,6 +12,8 @@ export default function WordEditor() {
   const [cutNode, setCutNode] = useState(null);
   const [copyNode, setCopyNode] = useState(null);
 
+  const baseURL = 'EDITOR-BACKEND-SERVICE/';
+
   const [contextMenu, setContextMenu] = useState(null);
   const [editingNodeId, setEditingNodeId] = useState(null);
 
@@ -87,7 +89,8 @@ export default function WordEditor() {
     const form = new FormData();
     form.append("file", file);
 
-    const res = await axios.post("http://localhost:4000/api/upload-file", form, {
+    const res = await axios.post(baseURL + "api/upload", form, {
+    // const res = await axios.post("http://localhost:4000/api/upload-file", form, {
       headers: { "Content-Type": "multipart/form-data" },
     });
 
@@ -192,7 +195,7 @@ export default function WordEditor() {
 
   // EXPORT WORD
   const exportWord = async () => {
-    const res = await axios.post("http://localhost:4000/api/export", nodes, {
+    const res = await axios.post(baseURL + "api/export", nodes, {
       responseType: "blob",
     });
     
