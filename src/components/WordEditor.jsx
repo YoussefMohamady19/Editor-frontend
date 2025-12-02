@@ -1,8 +1,10 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import Tree from "rc-tree";
 import "rc-tree/assets/index.css";
 import axios from "axios";
 import JoditEditor from "jodit-react";
+
+const MemoJodit = React.memo(JoditEditor, () => true);
 
 export default function WordEditor() {
   const [nodes, setNodes] = useState([]);
@@ -12,10 +14,10 @@ export default function WordEditor() {
   const [cutNode, setCutNode] = useState(null);
   const [copyNode, setCopyNode] = useState(null);
 
-  const baseURL = 'EDITOR-BACKEND-SERVICE/';
-
   const [contextMenu, setContextMenu] = useState(null);
   const [editingNodeId, setEditingNodeId] = useState(null);
+  const baseURL = 'EDITOR-BACKEND-SERVICE/';
+  const editorRef = useRef(null);
 
   useEffect(() => {
     const close = () => setContextMenu(null);
@@ -89,10 +91,13 @@ export default function WordEditor() {
     const form = new FormData();
     form.append("file", file);
 
-    const res = await axios.post(baseURL + "api/upload", form, {
-    // const res = await axios.post("http://localhost:4000/api/upload-file", form, {
-      headers: { "Content-Type": "multipart/form-data" },
-    });
+    const res = await axios.post(
+      "http://localhost:4000/api/upload-file",
+      form,
+      {
+        headers: { "Content-Type": "multipart/form-data" },
+      }
+    );
 
     setNodes(res.data.tree);
     setSelectedNode(null);
@@ -195,10 +200,10 @@ export default function WordEditor() {
 
   // EXPORT WORD
   const exportWord = async () => {
-    const res = await axios.post(baseURL + "api/export", nodes, {
+    const res = await axios.post("http://localhost:4000/api/export", nodes, {
       responseType: "blob",
     });
-    
+
     const url = window.URL.createObjectURL(new Blob([res.data]));
     const a = document.createElement("a");
     a.href = url;
@@ -206,9 +211,7 @@ export default function WordEditor() {
     a.click();
   };
 
-  // ---------------------------
-  // DRAG & DROP FIXED VERSION
-  // ---------------------------
+  // DRAG & DROP
   const onDrop = (info) => {
     const dragKey = info.dragNode.key;
     const dropKey = info.node.key;
@@ -224,7 +227,6 @@ export default function WordEditor() {
 
     if (!dragItem) return;
 
-    // Dropped INSIDE → CHILD
     if (!dropToGap) {
       dragItem.level = info.node.raw.level + 1;
       newTree = updateNode(newTree, dropKey, (n) => ({
@@ -234,7 +236,6 @@ export default function WordEditor() {
       return setNodes(newTree);
     }
 
-    // Dropped on GAP → sibling
     const targetLevel = info.node.raw.level;
     dragItem.level = targetLevel;
 
@@ -242,7 +243,6 @@ export default function WordEditor() {
     setNodes(newTree);
   };
 
-  // FIXED VERSION (No ESLint errors)
   const insertSibling = (list, targetId, item, dropPosition) => {
     let result = [];
 
@@ -290,16 +290,18 @@ export default function WordEditor() {
   }
 
   const config = {
-    readonly: false,
-    height: 600,
-    uploader: { insertImageAsBase64URI: true },
-  };
+  readonly: false,
+  height: 600,
+  uploader: { insertImageAsBase64URI: true },
+
+  // إزالة زر Insert File فقط
+  removeButtons: ["file"]
+};
 
   return (
     <div style={{ display: "flex", height: "92vh" }}>
       {/* LEFT SIDE */}
       <div style={{ width: "28%", borderRight: "1px solid #ccc", padding: 10 }}>
-        
         <div style={{ marginBottom: 10 }}>
           <input type="file" accept=".docx" onChange={uploadWord} />
 
@@ -314,7 +316,6 @@ export default function WordEditor() {
           </div>
         </div>
 
-        {/* Divider */}
         <div
           style={{
             height: "1px",
@@ -339,7 +340,6 @@ export default function WordEditor() {
           }}
         />
 
-        {/* Context Menu */}
         {contextMenu && (
           <div
             style={{
@@ -401,11 +401,14 @@ export default function WordEditor() {
                 marginTop: 10,
               }}
             >
-              <JoditEditor
-                value={selectedNode.contentHtml}
-                config={config}
-                onBlur={(content) => updateContent(content)}
-              />
+              <MemoJodit
+  key={selectedNode?.id}
+  ref={editorRef}
+  value={selectedNode?.contentHtml}
+  config={config}
+  onChange={(content) => updateContent(content)}
+/>
+
             </div>
           </>
         ) : (

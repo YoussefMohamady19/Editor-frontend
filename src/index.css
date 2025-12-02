@@ -11,3 +11,12 @@ code {
   font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
     monospace;
 }
+.rc-tree-title {
+  max-width: 300px;     /* عرض ثابت مناسب للعمود */
+  white-space: nowrap;   /* منع نزول السطر */
+  overflow: hidden;      /* اللي يخرج برا يتخبي */
+  text-overflow: ellipsis; /* يعمل ... */
+  display: inline-block;
+  vertical-align: middle;
+}
+
