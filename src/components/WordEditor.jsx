@@ -269,15 +269,23 @@ export default function WordEditor() {
 
   // EXPORT WORD
   const exportWord = async () => {
-    const res = await axios.post("http://localhost:4000/api/export", nodes, {
-      responseType: "blob",
-    });
+     const jsonString = JSON.stringify(nodes);
+      const base64Data = btoa(jsonString);
 
-    const url = window.URL.createObjectURL(new Blob([res.data]));
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "updated.docx";
-    a.click();
+    // const res = await axios.post("http://localhost:4000/api/export", nodes, {
+    //   responseType: "blob",
+    // });
+    const res = await axios.post(
+      "http://localhost:4000/api/export",
+      { data: base64Data },               // ← ابعت Base64
+      { responseType: "blob" }
+    );
+
+    // const url = window.URL.createObjectURL(new Blob([res.data]));
+    // const a = document.createElement("a");
+    // a.href = url;
+    // a.download = "updated.docx";
+    // a.click();
   };
 
   // DRAG & DROP
