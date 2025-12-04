@@ -19,11 +19,74 @@ export default function WordEditor() {
   const baseURL = 'EDITOR-BACKEND-SERVICE/';
   const editorRef = useRef(null);
 
+  const [loadingReport, setLoadingReport] = useState(false);
+  const [loadError, setLoadError] = useState(null);
+
+  // ---------- FUN HELPER: extract reportNumber robustly ----------
+  function getReportNumberFromUrl() {
+    try {
+      // 1) try normal search params first
+      const search = window.location.search || "";
+      if (search && search.indexOf("?") === 0) {
+        const p = new URLSearchParams(search);
+        const rn = p.get("reportNumber");
+        if (rn) return rn;
+      }
+
+      // 2) otherwise try hash: something like "#...?...reportNumber=213&..."
+      const hash = window.location.hash || "";
+      if (hash.includes("?")) {
+        const parts = hash.split("?");
+        const paramString = parts.slice(1).join("?"); // everything after first '?'
+        const p = new URLSearchParams(paramString);
+        const rn = p.get("reportNumber");
+        if (rn) return rn;
+      }
+
+      // 3) fallback: try to find reportNumber anywhere in full href (last resort)
+      const href = window.location.href || "";
+      const fallbackMatch = href.match(/[?&]reportNumber=([^&]+)/i);
+      if (fallbackMatch) return decodeURIComponent(fallbackMatch[1]);
+
+      return null;
+    } catch (err) {
+      console.error("getReportNumberFromUrl error:", err);
+      return null;
+    }
+  }
+
+  // ---------- CALL API to fetch report tree by number of report ----------
+  async function fetchReport(reportNumber) {
+    try {
+      setLoadingReport(true);
+      setLoadError(null);
+      console.log(reportNumber);
+      // ====== adapt this endpoint to your backend route ya magdy ======
+      const res = await axios.get(
+        `http://localhost:4000/api/report/${encodeURIComponent(reportNumber)}`
+      );
+
+      // Expecting res.data.tree 
+      setNodes(res.data.tree || []);
+      setSelectedNode(null);
+    } catch (err) {
+      console.error("fetchReport error:", err);
+      setLoadError(err?.response?.data || err.message || "Failed to load report");
+    } finally {
+      setLoadingReport(false);
+    }
+  }
+
+  // ---------- run on mount: check URL and auto-load if reportNumber present ----------
   useEffect(() => {
-    const close = () => setContextMenu(null);
-    window.addEventListener("click", close);
-    return () => window.removeEventListener("click", close);
+    const rn = getReportNumberFromUrl();
+    if (rn) {
+      fetchReport(rn);
+    }
+    // else do nothing (upload input remains available)
   }, []);
+
+  // ---------- rest of your component (mostly unchanged) ----------
 
   // APPLY INLINE RENAME
   const applyInlineRename = (id) => {
@@ -83,7 +146,7 @@ export default function WordEditor() {
     setContextMenu(null);
   };
 
-  // UPLOAD DOCX
+  // UPLOAD DOCX (fallback if no reportNumber)
   const uploadWord = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -91,20 +154,26 @@ export default function WordEditor() {
     const form = new FormData();
     form.append("file", file);
 
-    const res = await axios.post(
-      "http://localhost:4000/api/upload-file",
-      form,
-      {
-        headers: { "Content-Type": "multipart/form-data" },
-      }
-    );
+    try {
+      const res = await axios.post(
+        "http://localhost:4000/api/upload-file",
+        form,
+        {
+          headers: { "Content-Type": "multipart/form-data" },
+        }
+      );
 
-    setNodes(res.data.tree);
-    setSelectedNode(null);
+      setNodes(res.data.tree);
+      setSelectedNode(null);
+    } catch (err) {
+      console.error("uploadWord error:", err);
+      setLoadError(err?.response?.data || err.message || "Upload failed");
+    }
   };
 
   // UPDATE CONTENT
   const updateContent = (html) => {
+    if (!selectedNode) return;
     const updated = updateNode(nodes, selectedNode.id, (n) => ({
       ...n,
       contentHtml: html,
@@ -290,20 +359,21 @@ export default function WordEditor() {
   }
 
   const config = {
-  readonly: false,
-  height: 600,
-  uploader: { insertImageAsBase64URI: true },
-
-  // إزالة زر Insert File فقط
-  removeButtons: ["file"]
-};
+    readonly: false,
+    height: 600,
+    uploader: { insertImageAsBase64URI: true },
+    removeButtons: ["file"],
+  };
 
   return (
     <div style={{ display: "flex", height: "92vh" }}>
       {/* LEFT SIDE */}
       <div style={{ width: "28%", borderRight: "1px solid #ccc", padding: 10 }}>
         <div style={{ marginBottom: 10 }}>
-          <input type="file" accept=".docx" onChange={uploadWord} />
+          {/* show upload only when no auto-loaded report */}
+          {!loadingReport && nodes.length === 0 && (
+            <input type="file" accept=".docx" onChange={uploadWord} />
+          )}
 
           <div style={{ marginTop: 10 }}>
             <button onClick={addSection}>+ Section</button>
@@ -314,6 +384,13 @@ export default function WordEditor() {
               ⬇ Export
             </button>
           </div>
+
+          {loadingReport && <div style={{ marginTop: 8 }}>Loading report…</div>}
+          {loadError && (
+            <div style={{ marginTop: 8, color: "crimson" }}>
+              Error: {String(loadError)}
+            </div>
+          )}
         </div>
 
         <div
@@ -402,13 +479,12 @@ export default function WordEditor() {
               }}
             >
               <MemoJodit
-  key={selectedNode?.id}
-  ref={editorRef}
-  value={selectedNode?.contentHtml}
-  config={config}
-  onChange={(content) => updateContent(content)}
-/>
-
+                key={selectedNode?.id}
+                ref={editorRef}
+                value={selectedNode?.contentHtml}
+                config={config}
+                onChange={(content) => updateContent(content)}
+              />
             </div>
           </>
         ) : (
