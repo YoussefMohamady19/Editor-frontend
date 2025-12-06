@@ -23,12 +23,12 @@ modules:
           - Name: my_service_hello_world_html_repo_host
             ServiceInstanceName: editorapp-html5-app-host-service
             ServiceKeyName: editorapp_html_repo_host-key
-            sap.cloud.service: editorapp
+            sap.cloud.service: buildingpeople
           - Name: my_service_uaa_hello_world
             Authentication: OAuth2UserTokenExchange
             ServiceInstanceName: editorapp-xsuaa-service
             ServiceKeyName: uaa_editorapp-key
-            sap.cloud.service: editorapp
+            sap.cloud.service: buildingpeople
         existing_destinations_policy: ignore
   build-parameters:
     no-source: true

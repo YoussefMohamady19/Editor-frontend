@@ -8,7 +8,7 @@
     {
       "source": "^/EDITOR-BACKEND-SERVICE/(.*)$",
       "target": "/$1",
-      "destination": "EDITOR-BACKEND-SERVICE-DESTINATION",
+      "destination": "SAPHack2Build-srv-api",
       "authenticationType": "xsuaa",
       "csrfProtection": false
     },
