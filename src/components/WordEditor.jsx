@@ -174,6 +174,13 @@ export default function WordEditor() {
           headers: { "Content-Type": "multipart/form-data" },
         }
       );
+      //  const res = await axios.post(
+      //   "http://localhost:4000/api/upload-file",
+      //   form,
+      //   {
+      //     headers: { "Content-Type": "multipart/form-data" },
+      //   }
+      // );
 
       setNodes(res.data.tree);
       setSelectedNode(null);
@@ -297,11 +304,11 @@ const exportWord = async () => {
   console.log("✅ Base64 :", base64Data);
 
   // Download file
-  // const url = window.URL.createObjectURL(new Blob([res.data]));
-  // const a = document.createElement("a");
-  // a.href = url;
-  // a.download = "test.docx";
-  // a.click();
+  const url = window.URL.createObjectURL(new Blob([res.data]));
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "test.docx";
+  a.click();
 };
 
 
@@ -420,21 +427,38 @@ const exportWord = async () => {
         list.style.minWidth = "180px";
 
         const tags = [
-          "{ReportNumber}",
-          "{Adress}",
-          "{Date}",
-          "{CompanyName}"
-        ];
+  { label: "Report Number", value: "{ReportNumber}" },
+  { label: "Inspector", value: "{Inspector}" },
+  { label: "Cycle", value: "{Cycle}" },
+  { label: "Status", value: "{Status}" },
+  { label: "Created At", value: "{CreatedAt}" },
+  { label: "Created By", value: "{CreatedBy}" },
+  { label: "ID", value: "{ID}" },
+  { label: "Building Number", value: "{BuildingNumber}" },
+  { label: "City", value: "{City}" },
+  { label: "Country", value: "{Country}" },
+  { label: "State", value: "{State}" },
+  { label: "Address1", value: "{Address1}" },
+  { label: "Address2", value: "{Address2}" },
+  { label: "Lot", value: "{Lot}" },
+  { label: "Bin", value: "{Bin}" },
+  { label: "Block", value: "{Block}" },
+  { label: "Full Name", value: "{FullName}" },
+  { label: "Email", value: "{Email}" },
+  { label: "Phone", value: "{Phone}" }
+];
+
+
 
         tags.forEach(tag => {
           const btn = document.createElement("div");
-          btn.innerText = tag;
+          btn.innerText = tag.label;
           btn.style.cursor = "pointer";
           btn.style.padding = "6px";
           btn.style.borderBottom = "1px solid #eee";
 
           btn.onclick = () => {
-            editor.s.insertHTML(tag);
+            editor.s.insertHTML(tag.value);
             editor.events.fire("closeAllPopups");
           };
 
@@ -454,6 +478,10 @@ const exportWord = async () => {
       <div className="left-panel">
         <div style={{ marginBottom: 10 }}>
           {/* show upload only when no auto-loaded report */}
+               {/* show upload only when no auto-loaded report */}
+          {!loadingReport && nodes.length === 0 && (
+            <input type="file" accept=".docx" onChange={uploadWord} />
+          )}
 
           <div style={{ marginTop: 10 }}>
             <button onClick={addSection}>+ Section</button>
