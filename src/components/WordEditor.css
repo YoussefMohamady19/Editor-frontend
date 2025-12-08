@@ -1,0 +1,63 @@
+.tree-title {
+  display: inline-block;
+  max-width: 220px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 14px;
+  transition: 0.3s;
+}
+
+@media (max-width: 1200px) {
+  .tree-title {
+    max-width: 160px;
+    font-size: 13px;
+  }
+}
+
+@media (max-width: 992px) {
+  .tree-title {
+    max-width: 120px;
+    font-size: 12px;
+  }
+}
+
+@media (max-width: 768px) {
+  .tree-title {
+    max-width: 90px;
+    font-size: 11px;
+  }
+}
+
+@media (max-width: 576px) {
+  .tree-title {
+    max-width: 70px;
+    font-size: 10px;
+  }
+}
+
+/* left panel responsive */
+.left-panel {
+  width: 28%;
+  border-right: 1px solid #ccc;
+  padding: 10px;
+  transition: 0.3s;
+}
+
+@media (max-width: 992px) {
+  .left-panel {
+    width: 35%;
+  }
+}
+
+@media (max-width: 768px) {
+  .left-panel {
+    width: 40%;
+  }
+}
+
+@media (max-width: 576px) {
+  .left-panel {
+    width: 45%;
+  }
+}

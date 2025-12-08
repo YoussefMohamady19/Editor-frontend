@@ -3,6 +3,7 @@ import Tree from "rc-tree";
 import "rc-tree/assets/index.css";
 import axios from "axios";
 import JoditEditor from "jodit-react";
+import "../components/WordEditor.css";
 
 const MemoJodit = React.memo(JoditEditor, () => true);
 
@@ -128,7 +129,12 @@ export default function WordEditor() {
       );
     }
 
-    return <span style={{ cursor: "pointer" }}>{node.title}</span>;
+    return (
+  <span className="tree-title" title={node.title}>
+    {node.title}
+  </span>
+);
+
   };
 
   // MAP TREE DATA
@@ -268,25 +274,33 @@ export default function WordEditor() {
   };
 
   // EXPORT WORD
-  const exportWord = async () => {
-     const jsonString = JSON.stringify(nodes);
-      const base64Data = btoa(jsonString);
+const exportWord = async () => {
+  const jsonString = JSON.stringify(nodes);
 
-    // const res = await axios.post("http://localhost:4000/api/export", nodes, {
-    //   responseType: "blob",
-    // });
-    const res = await axios.post(
-      "http://localhost:4000/api/export",
-      { data: base64Data },               // ← ابعت Base64
-      { responseType: "blob" }
-    );
+  const encoder = new TextEncoder();
+  const bytes = encoder.encode(jsonString);
+  const base64Data = btoa(
+    bytes.reduce((data, byte) => data + String.fromCharCode(byte), "")
+  );
 
-    // const url = window.URL.createObjectURL(new Blob([res.data]));
-    // const a = document.createElement("a");
-    // a.href = url;
-    // a.download = "updated.docx";
-    // a.click();
-  };
+  const res = await axios.post(
+    "http://localhost:4000/api/export",
+    { data: base64Data },
+    { responseType: "blob" }
+  );
+  console.log("✅ Base64 :", base64Data);
+
+  // Download file
+  // const url = window.URL.createObjectURL(new Blob([res.data]));
+  // const a = document.createElement("a");
+  // a.href = url;
+  // a.download = "test.docx";
+  // a.click();
+};
+
+
+
+
 
   // DRAG & DROP
   const onDrop = (info) => {
@@ -366,17 +380,72 @@ export default function WordEditor() {
     return result;
   }
 
+  // const config = {
+  //   readonly: false,
+  //   height: 600,
+  //   uploader: { insertImageAsBase64URI: true },
+  //   removeButtons: ["file"],
+  // };
   const config = {
-    readonly: false,
-    height: 600,
-    uploader: { insertImageAsBase64URI: true },
-    removeButtons: ["file"],
-  };
+  readonly: false,
+  height: 600,
+  uploader: { insertImageAsBase64URI: true },
+  removeButtons: ["file"],
+
+  buttons: [
+    "bold", "italic", "underline", "|",
+    "ul", "ol", "|",
+    "font", "fontsize", "|",
+    "align", "|",
+    "link", "image", "|",
+
+    // ✅ ضيف زر الـ Tags هنا
+    "tagsDropdown"
+  ],
+
+  extraButtons: [
+    {
+      name: "🏷 Tags",
+      icon: "select",
+      tooltip: "Insert Tag",
+      popup: (editor, current, self) => {
+        const list = document.createElement("div");
+        list.style.padding = "10px";
+        list.style.minWidth = "180px";
+
+        const tags = [
+          "{ReportNumber}",
+          "{Adress}",
+          "{Date}",
+          "{CompanyName}"
+        ];
+
+        tags.forEach(tag => {
+          const btn = document.createElement("div");
+          btn.innerText = tag;
+          btn.style.cursor = "pointer";
+          btn.style.padding = "6px";
+          btn.style.borderBottom = "1px solid #eee";
+
+          btn.onclick = () => {
+            editor.s.insertHTML(tag);
+            editor.events.fire("closeAllPopups");
+          };
+
+          list.appendChild(btn);
+        });
+
+        return list;
+      }
+    }
+  ]
+};
+
 
   return (
     <div style={{ display: "flex", height: "92vh" }}>
       {/* LEFT SIDE */}
-      <div style={{ width: "28%", borderRight: "1px solid #ccc", padding: 10 }}>
+      <div className="left-panel">
         <div style={{ marginBottom: 10 }}>
           {/* show upload only when no auto-loaded report */}
           {!loadingReport && nodes.length === 0 && (
