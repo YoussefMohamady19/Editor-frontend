@@ -18,6 +18,11 @@ export default function WordEditor() {
   const [contextMenu, setContextMenu] = useState(null);
   const [editingNodeId, setEditingNodeId] = useState(null);
   const baseURL = 'EDITOR-BACKEND-SERVICE/';
+
+  const instance = axios.create({
+    baseURL
+  });
+
   const editorRef = useRef(null);
 
   const [loadingReport, setLoadingReport] = useState(false);
@@ -63,12 +68,13 @@ export default function WordEditor() {
       setLoadError(null);
       console.log(reportNumber);
       // ====== adapt this endpoint to your backend route ya magdy ======
-      const res = await axios.get(
-        `http://localhost:4000/api/report/${encodeURIComponent(reportNumber)}`
+      const res = await instance.post(
+        `/service/SAPHack2BuildSvcs/getTemplateInBase64ByReportId`,
+        { reportNumber: reportNumber }
       );
-
+      console.log(res.data);
       // Expecting res.data.tree 
-      setNodes(res.data.tree || []);
+      setNodes(res.data.value || []);
       setSelectedNode(null);
     } catch (err) {
       console.error("fetchReport error:", err);
@@ -161,8 +167,8 @@ export default function WordEditor() {
     form.append("file", file);
 
     try {
-      const res = await axios.post(
-        "http://localhost:4000/api/upload-file",
+      const res = await instance.post(
+        "/api/upload-file",
         form,
         {
           headers: { "Content-Type": "multipart/form-data" },
@@ -448,9 +454,6 @@ const exportWord = async () => {
       <div className="left-panel">
         <div style={{ marginBottom: 10 }}>
           {/* show upload only when no auto-loaded report */}
-          {!loadingReport && nodes.length === 0 && (
-            <input type="file" accept=".docx" onChange={uploadWord} />
-          )}
 
           <div style={{ marginTop: 10 }}>
             <button onClick={addSection}>+ Section</button>
