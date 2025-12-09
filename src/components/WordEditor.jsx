@@ -17,6 +17,8 @@ export default function WordEditor() {
 
   const [contextMenu, setContextMenu] = useState(null);
   const [editingNodeId, setEditingNodeId] = useState(null);
+  const [toast, setToast] = useState({ show: false, message: "", type: "" });
+
   const baseURL = 'EDITOR-BACKEND-SERVICE/';
 
   const instance = axios.create({
@@ -60,6 +62,37 @@ export default function WordEditor() {
       return null;
     }
   }
+  function getIdFromUrl() {
+    try {
+      const search = window.location.search || "";
+      const hash = window.location.hash || "";
+      const href = window.location.href || "";
+
+      // 1) من search
+      if (search.startsWith("?")) {
+        const p = new URLSearchParams(search);
+        const id = p.get("ID");
+        if (id) return id;
+      }
+
+      // 2) من hash
+      if (hash.includes("?")) {
+        const paramString = hash.split("?").slice(1).join("?");
+        const p = new URLSearchParams(paramString);
+        const id = p.get("ID");
+        if (id) return id;
+      }
+
+      // 3) regex
+      const match = href.match(/[?&]ID=([^&]+)/i);
+      if (match) return decodeURIComponent(match[1]);
+
+      return null;
+    } catch (err) {
+      console.error("getIdFromUrl error:", err);
+      return null;
+    }
+  }
 
   // ---------- CALL API to fetch report tree by number of report ----------
   async function fetchReport(reportNumber) {
@@ -83,12 +116,42 @@ export default function WordEditor() {
       setLoadingReport(false);
     }
   }
+  async function fetchTemplate(id) {
+    try {
+      setLoadingReport(true);
+      setLoadError(null);
+      console.log("Fetching by ID:", id);
+
+      // ✅ غير الـ endpoint حسب اللي عندك في الباك إند
+      const res = await instance.post(
+        `/service/SAPHack2BuildSvcs/getTemplateInBase64ByTemplateId`,
+        { ID: id }
+      );
+
+      console.log(res.data);
+
+      // Expecting res.data.tree 
+      setNodes(res.data.value || []);
+      setSelectedNode(null);
+    } catch (err) {
+      console.error("fetchById error:", err);
+      setLoadError(err?.response?.data || err.message || "Failed to load by ID");
+    } finally {
+      setLoadingReport(false);
+    }
+  }
+
 
   // ---------- run on mount: check URL and auto-load if reportNumber present ----------
   useEffect(() => {
     const rn = getReportNumberFromUrl();
     if (rn) {
       fetchReport(rn);
+    }
+    else {
+      const ID = getIdFromUrl();
+      fetchTemplate(ID)
+
     }
     // else do nothing (upload input remains available)
   }, []);
@@ -150,6 +213,13 @@ export default function WordEditor() {
     raw: n,
     children: n.children.map((c) => convert(c)),
   });
+  const showToast = (message, type = "success") => {
+    setToast({ show: true, message, type });
+
+    setTimeout(() => {
+      setToast({ show: false, message: "", type: "" });
+    }, 3000);
+  };
 
   const treeData = nodes.map((n) => convert(n));
 
@@ -167,8 +237,15 @@ export default function WordEditor() {
     form.append("file", file);
 
     try {
-      const res = await instance.post(
-        "/api/upload-file",
+      // const res = await instance.post(
+      //   "/api/upload-file",
+      //   form,
+      //   {
+      //     headers: { "Content-Type": "multipart/form-data" },
+      //   }
+      // );
+      const res = await axios.post(
+        "http://localhost:4000/api/upload-file",
         form,
         {
           headers: { "Content-Type": "multipart/form-data" },
@@ -281,27 +358,52 @@ export default function WordEditor() {
 
   // EXPORT WORD
   const exportWord = async () => {
-    const jsonString = JSON.stringify(nodes);
+    try {
+      const jsonString = JSON.stringify(nodes);
 
-    const encoder = new TextEncoder();
-    const bytes = encoder.encode(jsonString);
-    const base64Data = btoa(
-      bytes.reduce((data, byte) => data + String.fromCharCode(byte), "")
-    );
+      const encoder = new TextEncoder();
+      const bytes = encoder.encode(jsonString);
+      const base64Data = btoa(
+        bytes.reduce((data, byte) => data + String.fromCharCode(byte), "")
+      );
+      const ReportNumber = getReportNumberFromUrl();
+      if (ReportNumber) {
+        const res = await instance.post(
+          "/service/SAPHack2BuildSvcs/setTemplatebyTree",
+          { tree: base64Data, reportNumber: ReportNumber },
+          { responseType: "blob" }
+        );
 
-    const res = await instance.post(
-      "/service/SAPHack2BuildSvcs/setTemplatebyTree",
-      { tree: base64Data, reportNumber: getReportNumberFromUrl() },               // ← ابعت Base64
-      { responseType: "blob" }
-    );
-    console.log("✅ Base64 :", base64Data);
+      }
+      else {
+        const TempId = getIdFromUrl();
+        const res = await instance.post(
+          "/service/SAPHack2BuildSvcs/setTemplatebyID",
+          { tree: base64Data, ID: TempId },
+          { responseType: "blob" }
+        );
 
-    // Download file
-    // const url = window.URL.createObjectURL(new Blob([res.data]));
-    // const a = document.createElement("a");
-    // a.href = url;
-    // a.download = "test.docx";
-    // a.click();
+      }
+
+
+      console.log("✅ Base64 :", base64Data);
+
+      // Download file
+      // const url = window.URL.createObjectURL(new Blob([res.data]));
+      // const a = document.createElement("a");
+      // a.href = url;
+      // a.download = "test.docx";
+      // a.click();
+      showToast("The file was saved successfully ✅", "success");
+
+    }
+    catch (error) {
+      console.error(error);
+      showToast("An error occurred during saving ❌", "error");
+
+    }
+
+
   };
 
 
@@ -420,21 +522,38 @@ export default function WordEditor() {
           list.style.minWidth = "180px";
 
           const tags = [
-            "{ReportNumber}",
-            "{Adress}",
-            "{Date}",
-            "{CompanyName}"
+            { label: "Report Number", value: "{ReportNumber}" },
+            { label: "Inspector", value: "{Inspector}" },
+            { label: "Cycle", value: "{Cycle}" },
+            { label: "Status", value: "{Status}" },
+            { label: "Created At", value: "{CreatedAt}" },
+            { label: "Created By", value: "{CreatedBy}" },
+            { label: "ID", value: "{ID}" },
+            { label: "Building Number", value: "{BuildingNumber}" },
+            { label: "City", value: "{City}" },
+            { label: "Country", value: "{Country}" },
+            { label: "State", value: "{State}" },
+            { label: "Address1", value: "{Address1}" },
+            { label: "Address2", value: "{Address2}" },
+            { label: "Lot", value: "{Lot}" },
+            { label: "Bin", value: "{Bin}" },
+            { label: "Block", value: "{Block}" },
+            { label: "Full Name", value: "{FullName}" },
+            { label: "Email", value: "{Email}" },
+            { label: "Phone", value: "{Phone}" }
           ];
+
+
 
           tags.forEach(tag => {
             const btn = document.createElement("div");
-            btn.innerText = tag;
+            btn.innerText = tag.label;
             btn.style.cursor = "pointer";
             btn.style.padding = "6px";
             btn.style.borderBottom = "1px solid #eee";
 
             btn.onclick = () => {
-              editor.s.insertHTML(tag);
+              editor.s.insertHTML(tag.value);
               editor.events.fire("closeAllPopups");
             };
 
@@ -449,128 +568,155 @@ export default function WordEditor() {
 
 
   return (
-    <div style={{ display: "flex", height: "92vh" }}>
-      {/* LEFT SIDE */}
-      <div className="left-panel">
-        <div style={{ marginBottom: 10 }}>
-          {/* show upload only when no auto-loaded report */}
+    <>
+      {/* ✅ الـ Toast لازم يتحط هنا */}
+      {toast.show && (
+        <div
+          style={{
+            position: "fixed",
+            bottom: 30,
+            right: 30,
+            background: toast.type === "success" ? "#4CAF50" : "#E53935",
+            color: "#fff",
+            padding: "12px 20px",
+            borderRadius: 8,
+            boxShadow: "0 4px 10px rgba(0,0,0,0.2)",
+            fontSize: 15,
+            zIndex: 99999,
+            animation: "fadeIn 0.4s ease",
+          }}
+        >
+          {toast.message}
+        </div>
+      )}
+      <div style={{ display: "flex", height: "92vh" }}>
+        {/* LEFT SIDE */}
+        <div className="left-panel">
+          <div style={{ marginBottom: 10 }}>
+            {/* show upload only when no auto-loaded report */}
+            {/* show upload only when no auto-loaded report */}
+            {!loadingReport && nodes.length === 0 && (
+              <input type="file" accept=".docx" onChange={uploadWord} />
+            )}
 
-          <div style={{ marginTop: 10 }}>
-            <button onClick={addSection}>+ Section</button>
-            <button onClick={addSubSection} style={{ marginLeft: 8 }}>
-              + Sub
-            </button>
-            <button onClick={exportWord} style={{ marginLeft: 8 }}>
-              ⬇ Export
-            </button>
+            <div style={{ marginTop: 10 }}>
+              <button onClick={addSection}>+ Section</button>
+              <button onClick={addSubSection} style={{ marginLeft: 8 }}>
+                + Sub
+              </button>
+              <button onClick={exportWord} style={{ marginLeft: 8 }}>
+                Save
+              </button>
+            </div>
+
+            {loadingReport && <div style={{ marginTop: 8 }}>Loading report…</div>}
+            {loadError && (
+              <div style={{ marginTop: 8, color: "crimson" }}>
+                Error: {String(loadError)}
+              </div>
+            )}
           </div>
 
-          {loadingReport && <div style={{ marginTop: 8 }}>Loading report…</div>}
-          {loadError && (
-            <div style={{ marginTop: 8, color: "crimson" }}>
-              Error: {String(loadError)}
+          <div
+            style={{
+              height: "1px",
+              background: "#d9d9d9",
+              margin: "12px 0",
+            }}
+          ></div>
+
+          <Tree
+            treeData={treeData}
+            defaultExpandAll
+            draggable
+            onSelect={onSelect}
+            onDrop={onDrop}
+            onRightClick={(info) => {
+              setSelectedNode(info.node.raw);
+              setContextMenu({
+                x: info.event.clientX,
+                y: info.event.clientY,
+                node: info.node.raw,
+              });
+            }}
+          />
+
+          {contextMenu && (
+            <div
+              style={{
+                position: "fixed",
+                top: contextMenu.y,
+                left: contextMenu.x,
+                background: "#fff",
+                border: "1px solid #ccc",
+                borderRadius: 4,
+                boxShadow: "0 2px 6px rgba(0,0,0,0.2)",
+                zIndex: 9999,
+                width: 150,
+                padding: "4px 0",
+              }}
+            >
+              {[
+                { label: "✂ Cut", action: cut },
+                { label: "📄 Copy", action: copy },
+                { label: "📌 Paste", action: paste },
+                { label: "✏ Rename", action: rename },
+                { label: "🗑 Delete", action: deleteNode },
+              ].map((item) => (
+                <div
+                  key={item.label}
+                  onClick={() => {
+                    item.action();
+                    setContextMenu(null);
+                  }}
+                  style={{
+                    padding: "6px 12px",
+                    cursor: "pointer",
+                    fontSize: 14,
+                  }}
+                  onMouseEnter={(e) =>
+                    (e.target.style.background = "#f1f1f1")
+                  }
+                  onMouseLeave={(e) => (e.target.style.background = "#fff")}
+                >
+                  {item.label}
+                </div>
+              ))}
             </div>
           )}
         </div>
 
-        <div
-          style={{
-            height: "1px",
-            background: "#d9d9d9",
-            margin: "12px 0",
-          }}
-        ></div>
+        {/* RIGHT SIDE */}
+        <div style={{ flex: 1, padding: 20 }}>
+          {selectedNode ? (
+            <>
+              <h2>{selectedNode.title}</h2>
 
-        <Tree
-          treeData={treeData}
-          defaultExpandAll
-          draggable
-          onSelect={onSelect}
-          onDrop={onDrop}
-          onRightClick={(info) => {
-            setSelectedNode(info.node.raw);
-            setContextMenu({
-              x: info.event.clientX,
-              y: info.event.clientY,
-              node: info.node.raw,
-            });
-          }}
-        />
-
-        {contextMenu && (
-          <div
-            style={{
-              position: "fixed",
-              top: contextMenu.y,
-              left: contextMenu.x,
-              background: "#fff",
-              border: "1px solid #ccc",
-              borderRadius: 4,
-              boxShadow: "0 2px 6px rgba(0,0,0,0.2)",
-              zIndex: 9999,
-              width: 150,
-              padding: "4px 0",
-            }}
-          >
-            {[
-              { label: "✂ Cut", action: cut },
-              { label: "📄 Copy", action: copy },
-              { label: "📌 Paste", action: paste },
-              { label: "✏ Rename", action: rename },
-              { label: "🗑 Delete", action: deleteNode },
-            ].map((item) => (
               <div
-                key={item.label}
-                onClick={() => {
-                  item.action();
-                  setContextMenu(null);
-                }}
                 style={{
-                  padding: "6px 12px",
-                  cursor: "pointer",
-                  fontSize: 14,
+                  border: "1px solid #d0d0d0",
+                  borderRadius: 5,
+                  padding: 10,
+                  background: "#fff",
+                  minHeight: "75vh",
+                  marginTop: 10,
                 }}
-                onMouseEnter={(e) =>
-                  (e.target.style.background = "#f1f1f1")
-                }
-                onMouseLeave={(e) => (e.target.style.background = "#fff")}
               >
-                {item.label}
+                <MemoJodit
+                  key={selectedNode?.id}
+                  ref={editorRef}
+                  value={selectedNode?.contentHtml}
+                  config={config}
+                  onChange={(content) => updateContent(content)}
+                />
               </div>
-            ))}
-          </div>
-        )}
+            </>
+          ) : (
+            <h3>Select a section</h3>
+          )}
+        </div>
       </div>
+    </>
 
-      {/* RIGHT SIDE */}
-      <div style={{ flex: 1, padding: 20 }}>
-        {selectedNode ? (
-          <>
-            <h2>{selectedNode.title}</h2>
-
-            <div
-              style={{
-                border: "1px solid #d0d0d0",
-                borderRadius: 5,
-                padding: 10,
-                background: "#fff",
-                minHeight: "75vh",
-                marginTop: 10,
-              }}
-            >
-              <MemoJodit
-                key={selectedNode?.id}
-                ref={editorRef}
-                value={selectedNode?.contentHtml}
-                config={config}
-                onChange={(content) => updateContent(content)}
-              />
-            </div>
-          </>
-        ) : (
-          <h3>Select a section</h3>
-        )}
-      </div>
-    </div>
   );
 }
