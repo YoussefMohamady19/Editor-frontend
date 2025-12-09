@@ -17,6 +17,8 @@ export default function WordEditor() {
 
   const [contextMenu, setContextMenu] = useState(null);
   const [editingNodeId, setEditingNodeId] = useState(null);
+  const [toast, setToast] = useState({ show: false, message: "", type: "" });
+
   const baseURL = 'EDITOR-BACKEND-SERVICE/';
 
   const instance = axios.create({
@@ -60,6 +62,37 @@ export default function WordEditor() {
       return null;
     }
   }
+function getIdFromUrl() {
+  try {
+    const search = window.location.search || "";
+    const hash = window.location.hash || "";
+    const href = window.location.href || "";
+
+    // 1) من search
+    if (search.startsWith("?")) {
+      const p = new URLSearchParams(search);
+      const id = p.get("ID");
+      if (id) return id;
+    }
+
+    // 2) من hash
+    if (hash.includes("?")) {
+      const paramString = hash.split("?").slice(1).join("?");
+      const p = new URLSearchParams(paramString);
+      const id = p.get("ID");
+      if (id) return id;
+    }
+
+    // 3) regex
+    const match = href.match(/[?&]ID=([^&]+)/i);
+    if (match) return decodeURIComponent(match[1]);
+
+    return null;
+  } catch (err) {
+    console.error("getIdFromUrl error:", err);
+    return null;
+  }
+}
 
   // ---------- CALL API to fetch report tree by number of report ----------
   async function fetchReport(reportNumber) {
@@ -83,12 +116,42 @@ export default function WordEditor() {
       setLoadingReport(false);
     }
   }
+  async function fetchTemplate(id) {
+  try {
+    setLoadingReport(true);
+    setLoadError(null);
+    console.log("Fetching by ID:", id);
+
+    // ✅ غير الـ endpoint حسب اللي عندك في الباك إند
+    const res = await instance.post(
+      `/service/SAPHack2BuildSvcs/getTemplateInBase64ByTemplateId`,
+      { ID: id }
+    );
+
+    console.log(res.data);
+
+    // Expecting res.data.tree 
+    setNodes(res.data.value || []);
+    setSelectedNode(null);
+  } catch (err) {
+    console.error("fetchById error:", err);
+    setLoadError(err?.response?.data || err.message || "Failed to load by ID");
+  } finally {
+    setLoadingReport(false);
+  }
+}
+
 
   // ---------- run on mount: check URL and auto-load if reportNumber present ----------
   useEffect(() => {
     const rn = getReportNumberFromUrl();
     if (rn) {
       fetchReport(rn);
+    }
+    else{
+      const ID = getIdFromUrl();
+      fetchTemplate(ID)
+
     }
     // else do nothing (upload input remains available)
   }, []);
@@ -150,6 +213,13 @@ export default function WordEditor() {
     raw: n,
     children: n.children.map((c) => convert(c)),
   });
+  const showToast = (message, type = "success") => {
+    setToast({ show: true, message, type });
+
+    setTimeout(() => {
+      setToast({ show: false, message: "", type: "" });
+    }, 3000); 
+  };
 
   const treeData = nodes.map((n) => convert(n));
 
@@ -167,20 +237,20 @@ export default function WordEditor() {
     form.append("file", file);
 
     try {
-      const res = await instance.post(
-        "/api/upload-file",
-        form,
-        {
-          headers: { "Content-Type": "multipart/form-data" },
-        }
-      );
-      //  const res = await axios.post(
-      //   "http://localhost:4000/api/upload-file",
+      // const res = await instance.post(
+      //   "/api/upload-file",
       //   form,
       //   {
       //     headers: { "Content-Type": "multipart/form-data" },
       //   }
       // );
+       const res = await axios.post(
+        "http://localhost:4000/api/upload-file",
+        form,
+        {
+          headers: { "Content-Type": "multipart/form-data" },
+        }
+      );
 
       setNodes(res.data.tree);
       setSelectedNode(null);
@@ -288,27 +358,53 @@ export default function WordEditor() {
 
   // EXPORT WORD
 const exportWord = async () => {
-  const jsonString = JSON.stringify(nodes);
+  try{
+const jsonString = JSON.stringify(nodes);
 
   const encoder = new TextEncoder();
   const bytes = encoder.encode(jsonString);
   const base64Data = btoa(
     bytes.reduce((data, byte) => data + String.fromCharCode(byte), "")
   );
+const ReportNumber=getReportNumberFromUrl();
+if(ReportNumber)
+{
+  const res = await instance.post(
+      "/service/SAPHack2BuildSvcs/setTemplatebyTree",
+      { tree: base64Data, reportNumber: ReportNumber },             
+      { responseType: "blob" }
+    );
 
-  const res = await axios.post(
-    "http://localhost:4000/api/export",
-    { data: base64Data },
-    { responseType: "blob" }
-  );
+}
+else{
+  const TempId=getIdFromUrl();
+  const res = await instance.post(
+      "/service/SAPHack2BuildSvcs/setTemplatebyID",
+      { tree: base64Data, ID: TempId },              
+      { responseType: "blob" }
+    );
+
+}
+
+
   console.log("✅ Base64 :", base64Data);
 
   // Download file
-  const url = window.URL.createObjectURL(new Blob([res.data]));
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = "test.docx";
-  a.click();
+  // const url = window.URL.createObjectURL(new Blob([res.data]));
+  // const a = document.createElement("a");
+  // a.href = url;
+  // a.download = "test.docx";
+  // a.click();
+    showToast("The file was saved successfully ✅", "success");
+
+  }
+  catch (error){
+    console.error(error);
+    showToast("An error occurred during saving ❌", "error");
+
+  }
+  
+
 };
 
 
@@ -473,6 +569,27 @@ const exportWord = async () => {
 
 
   return (
+      <>
+    {/* ✅ الـ Toast لازم يتحط هنا */}
+    {toast.show && (
+      <div
+        style={{
+          position: "fixed",
+          bottom: 30,
+          right: 30,
+          background: toast.type === "success" ? "#4CAF50" : "#E53935",
+          color: "#fff",
+          padding: "12px 20px",
+          borderRadius: 8,
+          boxShadow: "0 4px 10px rgba(0,0,0,0.2)",
+          fontSize: 15,
+          zIndex: 99999,
+          animation: "fadeIn 0.4s ease",
+        }}
+      >
+        {toast.message}
+      </div>
+    )}
     <div style={{ display: "flex", height: "92vh" }}>
       {/* LEFT SIDE */}
       <div className="left-panel">
@@ -489,7 +606,7 @@ const exportWord = async () => {
               + Sub
             </button>
             <button onClick={exportWord} style={{ marginLeft: 8 }}>
-              ⬇ Export
+               Save
             </button>
           </div>
 
@@ -600,5 +717,7 @@ const exportWord = async () => {
         )}
       </div>
     </div>
+      </>
+
   );
 }
