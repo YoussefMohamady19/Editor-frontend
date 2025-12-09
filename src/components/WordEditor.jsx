@@ -71,7 +71,7 @@ function getIdFromUrl() {
     // 1) من search
     if (search.startsWith("?")) {
       const p = new URLSearchParams(search);
-      const id = p.get("ID");
+      const id = p.get("templateID");
       if (id) return id;
     }
 
@@ -79,12 +79,12 @@ function getIdFromUrl() {
     if (hash.includes("?")) {
       const paramString = hash.split("?").slice(1).join("?");
       const p = new URLSearchParams(paramString);
-      const id = p.get("ID");
+      const id = p.get("templateID");
       if (id) return id;
     }
 
     // 3) regex
-    const match = href.match(/[?&]ID=([^&]+)/i);
+    const match = href.match(/[?&]templateID=([^&]+)/i);
     if (match) return decodeURIComponent(match[1]);
 
     return null;
