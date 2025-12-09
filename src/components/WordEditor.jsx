@@ -136,10 +136,10 @@ export default function WordEditor() {
     }
 
     return (
-  <span className="tree-title" title={node.title}>
-    {node.title}
-  </span>
-);
+      <span className="tree-title" title={node.title}>
+        {node.title}
+      </span>
+    );
 
   };
 
@@ -280,29 +280,29 @@ export default function WordEditor() {
   };
 
   // EXPORT WORD
-const exportWord = async () => {
-  const jsonString = JSON.stringify(nodes);
+  const exportWord = async () => {
+    const jsonString = JSON.stringify(nodes);
 
-  const encoder = new TextEncoder();
-  const bytes = encoder.encode(jsonString);
-  const base64Data = btoa(
-    bytes.reduce((data, byte) => data + String.fromCharCode(byte), "")
-  );
+    const encoder = new TextEncoder();
+    const bytes = encoder.encode(jsonString);
+    const base64Data = btoa(
+      bytes.reduce((data, byte) => data + String.fromCharCode(byte), "")
+    );
 
-  const res = await axios.post(
-    "http://localhost:4000/api/export",
-    { data: base64Data },
-    { responseType: "blob" }
-  );
-  console.log("✅ Base64 :", base64Data);
+    const res = await instance.post(
+      "/service/SAPHack2BuildSvcs/setTemplatebyTree",
+      { tree: base64Data, reportNumber: getReportNumberFromUrl() },               // ← ابعت Base64
+      { responseType: "blob" }
+    );
+    console.log("✅ Base64 :", base64Data);
 
-  // Download file
-  // const url = window.URL.createObjectURL(new Blob([res.data]));
-  // const a = document.createElement("a");
-  // a.href = url;
-  // a.download = "test.docx";
-  // a.click();
-};
+    // Download file
+    // const url = window.URL.createObjectURL(new Blob([res.data]));
+    // const a = document.createElement("a");
+    // a.href = url;
+    // a.download = "test.docx";
+    // a.click();
+  };
 
 
 
@@ -393,59 +393,59 @@ const exportWord = async () => {
   //   removeButtons: ["file"],
   // };
   const config = {
-  readonly: false,
-  height: 600,
-  uploader: { insertImageAsBase64URI: true },
-  removeButtons: ["file"],
+    readonly: false,
+    height: 600,
+    uploader: { insertImageAsBase64URI: true },
+    removeButtons: ["file"],
 
-  buttons: [
-    "bold", "italic", "underline", "|",
-    "ul", "ol", "|",
-    "font", "fontsize", "|",
-    "align", "|",
-    "link", "image", "|",
+    buttons: [
+      "bold", "italic", "underline", "|",
+      "ul", "ol", "|",
+      "font", "fontsize", "|",
+      "align", "|",
+      "link", "image", "|",
 
-    // ✅ ضيف زر الـ Tags هنا
-    "tagsDropdown"
-  ],
+      // ✅ ضيف زر الـ Tags هنا
+      "tagsDropdown"
+    ],
 
-  extraButtons: [
-    {
-      name: "🏷 Tags",
-      icon: "select",
-      tooltip: "Insert Tag",
-      popup: (editor, current, self) => {
-        const list = document.createElement("div");
-        list.style.padding = "10px";
-        list.style.minWidth = "180px";
+    extraButtons: [
+      {
+        name: "🏷 Tags",
+        icon: "select",
+        tooltip: "Insert Tag",
+        popup: (editor, current, self) => {
+          const list = document.createElement("div");
+          list.style.padding = "10px";
+          list.style.minWidth = "180px";
 
-        const tags = [
-          "{ReportNumber}",
-          "{Adress}",
-          "{Date}",
-          "{CompanyName}"
-        ];
+          const tags = [
+            "{ReportNumber}",
+            "{Adress}",
+            "{Date}",
+            "{CompanyName}"
+          ];
 
-        tags.forEach(tag => {
-          const btn = document.createElement("div");
-          btn.innerText = tag;
-          btn.style.cursor = "pointer";
-          btn.style.padding = "6px";
-          btn.style.borderBottom = "1px solid #eee";
+          tags.forEach(tag => {
+            const btn = document.createElement("div");
+            btn.innerText = tag;
+            btn.style.cursor = "pointer";
+            btn.style.padding = "6px";
+            btn.style.borderBottom = "1px solid #eee";
 
-          btn.onclick = () => {
-            editor.s.insertHTML(tag);
-            editor.events.fire("closeAllPopups");
-          };
+            btn.onclick = () => {
+              editor.s.insertHTML(tag);
+              editor.events.fire("closeAllPopups");
+            };
 
-          list.appendChild(btn);
-        });
+            list.appendChild(btn);
+          });
 
-        return list;
+          return list;
+        }
       }
-    }
-  ]
-};
+    ]
+  };
 
 
   return (
